@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Equivalent Fractions Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body {
+        font-family: "Inter", sans-serif; /* Using Inter font */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+        background-color: #f0f4f8; /* Light background */
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      #controls,
+      #equation-display,
+      #p5-canvas-container {
+        background-color: white;
+        padding: 20px;
+        border-radius: 12px; /* Rounded corners */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+        margin-bottom: 20px;
+        width: 100%;
+        max-width: 700px; /* Limit width for better layout */
+        box-sizing: border-box;
+      }
+      #controls label,
+      #controls input,
+      #controls button {
+        margin: 5px;
+      }
+      #controls input {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        width: 60px; /* Fixed width for number inputs */
+        text-align: center;
+      }
+      #controls button {
+        padding: 10px 20px;
+        background-color: #4a90e2; /* Blue button */
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+      #controls button:hover {
+        background-color: #357abd; /* Darker blue on hover */
+      }
+      .fraction {
+        display: inline-flex; /* Use flexbox for vertical alignment */
+        flex-direction: column; /* Stack numerator and denominator */
+        align-items: center; /* Center horizontally */
+        margin: 0 10px; /* Spacing around fractions */
+        font-size: 1.5em; /* Larger font for fractions */
+        line-height: 1; /* Adjust line height for closeness */
+      }
+      .fraction span {
+        padding: 2px 0; /* Vertical padding within fraction */
+      }
+      .fraction .denominator {
+        border-top: 2px solid black; /* Fraction line */
+        padding-top: 4px; /* Space above denominator */
+      }
+      #equation-display {
+        text-align: center;
+        font-size: 1.8em; /* Larger font for the equation */
+        min-height: 50px; /* Ensure space even if empty */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      #p5-canvas-container {
+        display: flex; /* Use flexbox for layout */
+        justify-content: center; /* Center canvas horizontally */
+        align-items: center; /* Center canvas vertically */
+        padding: 10px; /* Padding around the canvas */
+        min-height: 250px; /* Minimum height for the canvas area */
+      }
+      canvas {
+        display: block; /* Remove extra space below canvas */
+        border-radius: 8px; /* Slightly rounded canvas corners */
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      }
+      .error-message {
+        color: #e53e3e; /* Red color for errors */
+        font-weight: bold;
+        margin-top: 10px;
+        text-align: center;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <h1 class="text-3xl font-bold mb-6 text-gray-800">
+      Equivalent Fractions Visualizer
+    </h1>
+
+    <div id="controls" class="flex flex-wrap items-center justify-center">
+      <label for="num">Numerator:</label>
+      <input type="number" id="num" value="1" min="0" />
+
+      <label for="den">Denominator:</label>
+      <input type="number" id="den" value="2" min="1" />
+
+      <label for="mult">Multiply by:</label>
+      <input type="number" id="mult" value="3" min="1" />
+
+      <button id="updateBtn">Visualize</button>
+      <div id="error" class="error-message w-full mt-3"></div>
+    </div>
+
+    <div id="equation-display"></div>
+
+    <div id="p5-canvas-container"></div>
+
+    <script>
+      let numInput, denInput, multInput, updateButton, equationDiv, errorDiv;
+      let currentNum = 1;
+      let currentDen = 2;
+      let currentMult = 3;
+      let canvasWidth = 600; // Initial canvas width
+      let canvasHeight = 200; // Fixed canvas height
+      const pieRadius = 75; // Radius for the pie charts
+      const padding = 50; // Padding around elements
+
+      function setup() {
+        // Calculate responsive canvas width
+        const containerWidth = document.getElementById(
+          "p5-canvas-container"
+        ).offsetWidth;
+        canvasWidth = Math.min(700 - 40, containerWidth - 20); // Adjust for container padding
+        if (canvasWidth < 400) canvasWidth = 400; // Minimum width
+
+        let canvas = createCanvas(canvasWidth, canvasHeight);
+        canvas.parent("p5-canvas-container"); // Place canvas in its container
+
+        // Get references to HTML elements
+        numInput = select("#num");
+        denInput = select("#den");
+        multInput = select("#mult");
+        updateButton = select("#updateBtn");
+        equationDiv = select("#equation-display");
+        errorDiv = select("#error");
+
+        // Set initial values from inputs
+        currentNum = parseInt(numInput.value());
+        currentDen = parseInt(denInput.value());
+        currentMult = parseInt(multInput.value());
+
+        // Add event listener to the button
+        updateButton.mousePressed(updateFraction);
+
+        // Add event listeners for Enter key on inputs
+        numInput.elt.addEventListener("keypress", handleEnter);
+        denInput.elt.addEventListener("keypress", handleEnter);
+        multInput.elt.addEventListener("keypress", handleEnter);
+
+        noLoop(); // Draw only when updateFraction is called
+        updateFraction(); // Initial draw
+      }
+
+      function draw() {
+        background(255); // White background for the canvas
+        textAlign(CENTER, CENTER);
+        textSize(20);
+        fill(0); // Black text
+
+        // --- Validation ---
+        if (
+          isNaN(currentNum) ||
+          isNaN(currentDen) ||
+          isNaN(currentMult) ||
+          currentDen <= 0 ||
+          currentMult <= 0 ||
+          currentNum < 0 ||
+          currentNum > currentDen
+        ) {
+          // Error handling is done in updateFraction, just clear canvas if invalid
+          errorDiv.html(
+            "Invalid input. Denominator and multiplier must be > 0. Numerator must be >= 0 and <= Denominator."
+          );
+          equationDiv.html(""); // Clear equation display
+          return; // Stop drawing if input is invalid
+        } else {
+          errorDiv.html(""); // Clear error message if valid
+        }
+
+        // --- Calculations ---
+        const newNum = currentNum * currentMult;
+        const newDen = currentDen * currentMult;
+
+        // --- Display Equation ---
+        displayEquation(currentNum, currentDen, currentMult, newNum, newDen);
+
+        // --- Draw Visuals ---
+        const spacing = (width - padding * 2) / 4; // Calculate spacing between elements
+        const yPos = height / 2; // Vertical center
+
+        // 1. Original Pie Chart
+        const pie1X = padding + spacing * 0.5;
+        drawPieChart(currentNum, currentDen, pie1X, yPos, pieRadius);
+
+        // 2. Multiplication Symbol
+        const multSymbolX = padding + spacing * 1.5;
+        fill(0);
+        noStroke();
+        textSize(30);
+        text("x", multSymbolX, yPos - 15); // Position multiplication symbol
+        // Display the multiplier number (e.g., "3") below the 'x'
+        textSize(25);
+        text(currentMult, multSymbolX, yPos + 25);
+
+        // 3. Equals Symbol
+        const equalsSymbolX = padding + spacing * 2.5;
+        fill(0);
+        noStroke();
+        textSize(30);
+        text("=", equalsSymbolX, yPos);
+
+        // 4. Resulting Pie Chart
+        const pie2X = padding + spacing * 3.5;
+        drawPieChart(newNum, newDen, pie2X, yPos, pieRadius);
+      }
+
+      // --- Helper Functions ---
+
+      function handleEnter(event) {
+        if (event.key === "Enter") {
+          updateFraction();
+        }
+      }
+
+      function updateFraction() {
+        // Get values and validate
+        let numVal = parseInt(numInput.value());
+        let denVal = parseInt(denInput.value());
+        let multVal = parseInt(multInput.value());
+
+        if (
+          isNaN(numVal) ||
+          isNaN(denVal) ||
+          isNaN(multVal) ||
+          denVal <= 0 ||
+          multVal <= 0 ||
+          numVal < 0
+        ) {
+          errorDiv.html(
+            "Invalid input. Denominator and multiplier must be > 0. Numerator must be >= 0."
+          );
+          equationDiv.html(""); // Clear equation
+          redraw(); // Redraw canvas (likely showing nothing or an error state if implemented)
+          return;
+        }
+        if (numVal > denVal) {
+          errorDiv.html(
+            "Numerator cannot be greater than the denominator for this visualization."
+          );
+          equationDiv.html(""); // Clear equation
+          redraw();
+          return;
+        }
+
+        // Update global variables if valid
+        currentNum = numVal;
+        currentDen = denVal;
+        currentMult = multVal;
+        errorDiv.html(""); // Clear any previous error message
+        redraw(); // Trigger a redraw with new values
+      }
+
+      function displayEquation(num1, den1, mult, num2, den2) {
+        // Create HTML string for the equation with vertical fractions
+        const fraction1HTML = `<div class="fraction"><span>${num1}</span><span class="denominator">${den1}</span></div>`;
+        const multiplierHTML = `<div class="fraction"><span>${mult}</span><span class="denominator">${mult}</span></div>`;
+        const fraction2HTML = `<div class="fraction"><span>${num2}</span><span class="denominator">${den2}</span></div>`;
+
+        equationDiv.html(
+          `${fraction1HTML} &nbsp; x &nbsp; ${multiplierHTML} &nbsp; = &nbsp; ${fraction2HTML}`
+        );
+      }
+
+      function drawPieChart(numerator, denominator, x, y, radius) {
+        if (denominator <= 0) return; // Avoid division by zero
+
+        const angle = TWO_PI / denominator; // Angle for each slice
+        const startAngle = -HALF_PI; // Start drawing from the top
+
+        push(); // Isolate drawing styles
+        translate(x, y); // Move origin to the center of the pie
+
+        // Draw the shaded slices (numerator)
+        fill(100, 150, 255, 200); // Light blue fill with some transparency
+        stroke(0); // Black outline
+        strokeWeight(1.5);
+        for (let i = 0; i < numerator; i++) {
+          arc(
+            0,
+            0,
+            radius * 2,
+            radius * 2,
+            startAngle + i * angle,
+            startAngle + (i + 1) * angle,
+            PIE
+          );
+        }
+
+        // Draw the unshaded slices (denominator - numerator)
+        fill(255, 255, 255, 180); // White fill with some transparency
+        stroke(200); // Lighter outline for unshaded parts
+        strokeWeight(1);
+        for (let i = numerator; i < denominator; i++) {
+          arc(
+            0,
+            0,
+            radius * 2,
+            radius * 2,
+            startAngle + i * angle,
+            startAngle + (i + 1) * angle,
+            PIE
+          );
+        }
+
+        // Draw a final outline for the whole circle for clarity
+        noFill();
+        stroke(0);
+        strokeWeight(2);
+        ellipse(0, 0, radius * 2, radius * 2);
+
+        pop(); // Restore original drawing styles
+      }
+
+      // Adjust canvas size on window resize
+      function windowResized() {
+        const containerWidth = document.getElementById(
+          "p5-canvas-container"
+        ).offsetWidth;
+        canvasWidth = Math.min(700 - 40, containerWidth - 20); // Adjust for container padding
+        if (canvasWidth < 400) canvasWidth = 400; // Minimum width
+        resizeCanvas(canvasWidth, canvasHeight);
+        redraw(); // Redraw with new size
+      }
+    </script>
+  </body>
+</html>
